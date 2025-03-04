@@ -19,8 +19,8 @@ void rowMajorAccess(int** arr, int row_size, int col_size) {
 
 void columnMajorAccess(int** arr, int row_size, int col_size) {
     size_t sum = 0;
-    for (int j = 0; j < row_size; j++) {
-        for (int i = 0; i < col_size; i++) {
+    for (int i = 0; i < row_size; i++) {
+            for (int j = 0; j < col_size; j++) {
             sum += arr[i][j];
         }
     }
@@ -76,7 +76,6 @@ int main(int argc, char **argv) {
     rowMajorAccess(arr, row_size, col_size);
     auto end_row = high_resolution_clock::now();
     auto duration_row = duration_cast<microseconds>(end_row - start_row);
-
     auto start_col = high_resolution_clock::now();
     columnMajorAccess(arr, row_size, col_size);
     auto end_col = high_resolution_clock::now();
