@@ -8,23 +8,21 @@ using namespace std;
 using namespace std::chrono;
 
 void rowMajorAccess(int** arr, int row_size, int col_size) {
-    size_t sum = 0;
+    volatile size_t sum = 0;
     for (int i = 0; i < row_size; i++) {
         for (int j = 0; j < col_size; j++) {
             sum += arr[i][j];
         }
     }
-    volatile int result = sum;
 }
 
 void columnMajorAccess(int** arr, int row_size, int col_size) {
-    size_t sum = 0;
+    volatile size_t sum = 0;
     for (int i = 0; i < row_size; i++) {
             for (int j = 0; j < col_size; j++) {
             sum += arr[i][j];
         }
     }
-    volatile int result = sum;
 }
 
 int **parse_and_initialize(zen::cmd_args &args, int &row_size, int &col_size)
