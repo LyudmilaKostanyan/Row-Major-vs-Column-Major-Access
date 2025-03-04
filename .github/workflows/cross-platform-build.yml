@@ -83,14 +83,14 @@ jobs:
       if: runner.os != 'Windows'
       run: |
         cd build
-        ./main
+        ./main --row_size 5000
 
     - name: Run tests (Windows)
       if: runner.os == 'Windows'
       shell: msys2 {0}
       run: |
         cd build
-        ./main.exe
+        ./main.exe --row_size 5000
 
     - name: Debug with GDB (Linux)
       if: matrix.os == 'ubuntu-latest'
@@ -103,7 +103,7 @@ jobs:
           echo "run" > gdb_commands.txt
           echo "bt full" >> gdb_commands.txt
           echo "Running GDB:"
-          gdb --batch --quiet -x gdb_commands.txt "$executable --row_size 500"
+          gdb --batch --quiet -x gdb_commands.txt "$executable"
         fi
       continue-on-error: true
 
@@ -120,7 +120,7 @@ jobs:
           echo "GDB found, running it"
           echo "run" > gdb_commands.txt
           echo "bt full" >> gdb_commands.txt
-          "$gdb_path" --batch --quiet -x gdb_commands.txt "$executable --row_size 500"
+          "$gdb_path" --batch --quiet -x gdb_commands.txt "$executable"
         else
           echo "GDB not found, skipping debugging"
         fi

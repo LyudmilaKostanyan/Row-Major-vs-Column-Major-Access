@@ -18,8 +18,8 @@ void rowMajorAccess(int** arr, int row_size, int col_size) {
 
 void columnMajorAccess(int** arr, int row_size, int col_size) {
     volatile size_t sum = 0;
-    for (int i = 0; i < row_size; i++) {
-            for (int j = 0; j < col_size; j++) {
+    for (int j = 0; j < col_size; j++) {
+        for (int i = 0; i < row_size; i++) {
             sum += arr[i][j];
         }
     }
@@ -73,15 +73,15 @@ int main(int argc, char **argv) {
     auto start_row = high_resolution_clock::now();
     rowMajorAccess(arr, row_size, col_size);
     auto end_row = high_resolution_clock::now();
-    auto duration_row = duration_cast<microseconds>(end_row - start_row);
+    auto duration_row = duration_cast<milliseconds>(end_row - start_row);
     auto start_col = high_resolution_clock::now();
     columnMajorAccess(arr, row_size, col_size);
     auto end_col = high_resolution_clock::now();
-    auto duration_col = duration_cast<microseconds>(end_col - start_col);
+    auto duration_col = duration_cast<milliseconds>(end_col - start_col);
 
-    double row_ms = duration_row.count() / 1000.0;
-    double col_ms = duration_col.count() / 1000.0;
-    double diff_ms = (duration_col.count() - duration_row.count()) / 1000.0;
+    double row_ms = duration_row.count();
+    double col_ms = duration_col.count();
+    double diff_ms = (duration_col.count() - duration_row.count());
     double speedup = col_ms / row_ms;
 
     cout << "Array Size: " << row_size << " x " << col_size << endl;
@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
          << right << setw(7) << row_ms 
          << setw(12) << col_ms 
          << setw(12) << speedup 
-         << setw(12) << diff_ms << endl;
+         << setw(17) << diff_ms << endl;
     cout << "-----------------------------------------------------------------";
 
     for (int i = 0; i < row_size; i++) {
