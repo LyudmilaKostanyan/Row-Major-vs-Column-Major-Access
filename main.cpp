@@ -1,6 +1,7 @@
 #include <iostream>
 #include <iomanip>
 #include <cstdlib>
+#include <malloc.h>
 #include "kaizen.h"
 
 using namespace std;
@@ -124,7 +125,11 @@ void delete_matrix(int **matrix, int row_size)
 
 bool test_aligned_matrix(int row_size, int col_size)
 {
-    alignas(64) int*aligned_matrix = static_cast<int*>(std::aligned_alloc(64, row_size * col_size * sizeof(int)));
+    #ifdef _WIN32
+        alignas(64) int* aligned_matrix = static_cast<int*>(_aligned_malloc(row_size * col_size * sizeof(int), 64));
+    #else
+        alignas(64) int*aligned_matrix = static_cast<int*>(std::aligned_alloc(64, row_size * col_size * sizeof(int)));
+    #endif
     if (!aligned_matrix)
         return false;
     for (int i = 0; i < row_size * col_size; i++)
