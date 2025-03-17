@@ -1,11 +1,9 @@
 #include <iostream>
-#include <chrono>
 #include <iomanip>
-#include "kaizen.h"
 #include <cstdlib>
+#include "kaizen.h"
 
 using namespace std;
-using namespace std::chrono;
 
 void rowMajorAccess(int** matrix, int row_size, int col_size) {
     volatile size_t sum = 0;
@@ -25,17 +23,15 @@ void columnMajorAccess(int** matrix, int row_size, int col_size) {
     }
 }
 
-int** parse_and_initialize(zen::cmd_args &args, int &row_size, int &col_size)
+bool    parse_input(zen::cmd_args &args, int &row_size, int &col_size)
 {
-    int **matrix;
-
     auto row_options = args.get_options("--row_size");
     auto col_options = args.get_options("--col_size");
     
     if (row_options.empty() && col_options.empty())
     {
         std::cout << "Error: please write " << (row_options.empty() ? "--row_size" : "--col_size") << " parameter.";
-        return nullptr;
+        return false;
     }
 
     row_size = row_options.size() ? std::atoi(row_options[0].c_str()) : std::atoi(col_options[0].c_str());
@@ -44,12 +40,27 @@ int** parse_and_initialize(zen::cmd_args &args, int &row_size, int &col_size)
     if (!row_size || !col_size)
     {
         std::cout << "Error: Row and column values must be greater than 0.";
-        return nullptr;
+        return false;
     }
+    return true;
+}
+
+int** initialize_matrix(int row_size, int col_size)
+{
+    int **matrix;
     
     matrix = new int*[row_size];
+    if (!matrix)
+        return nullptr;
     for (int i = 0; i < row_size; i++) {
         matrix[i] = new int[col_size];
+        if (!matrix[i])
+        {
+            for (int j = 0; j < i; j++)
+                delete[] matrix[j];
+            delete[] matrix;
+            return nullptr;
+        }
     }
     
     for (int i = 0; i < row_size; i++) {
@@ -62,10 +73,11 @@ int** parse_and_initialize(zen::cmd_args &args, int &row_size, int &col_size)
 
 void output_results(auto duration_row, auto duration_col, auto row_size, auto col_size)
 {
-    double row_ms = duration_row.count();
-    double col_ms = duration_col.count();
-    double diff_ms = (duration_col.count() - duration_row.count());
-    double speedup = col_ms / row_ms;
+    
+    double row_ms = duration_row;
+    double col_ms = duration_col;
+    double diff_ms = duration_col - duration_row;
+    double speedup =  row_ms ? col_ms / row_ms : 0;
 
     cout << "Matrix Size: " << row_size << " x " << col_size << endl;
     cout << fixed << setprecision(2);
@@ -82,7 +94,59 @@ void output_results(auto duration_row, auto duration_col, auto row_size, auto co
          << setw(12) << col_ms 
          << setw(12) << speedup 
          << setw(17) << diff_ms << endl;
-    cout << "-----------------------------------------------------------------";
+    cout << "-----------------------------------------------------------------" << endl << endl;
+}
+
+void test_matrix_efficiency(int **matrix, int row_size, int col_size)
+{
+    zen::timer timer;
+
+    timer.start();
+    rowMajorAccess(matrix, row_size, col_size);
+    timer.stop();
+    auto duration_row = timer.duration<zen::timer::msec>().count();
+    
+    timer.start();
+    columnMajorAccess(matrix, row_size, col_size);
+    timer.stop();
+    auto duration_col = timer.duration<zen::timer::msec>().count();
+    
+    output_results(duration_row, duration_col, row_size, col_size);
+}
+
+void delete_matrix(int **matrix, int row_size)
+{
+    for (int i = 0; i < row_size; i++) {
+        delete[] matrix[i];
+    }
+    delete[] matrix;
+}
+
+bool test_aligned_matrix(int row_size, int col_size)
+{
+    alignas(64) int*aligned_matrix = static_cast<int*>(std::aligned_alloc(64, row_size * col_size * sizeof(int)));
+    if (!aligned_matrix)
+        return false;
+    for (int i = 0; i < row_size * col_size; i++)
+        aligned_matrix[i] = i;
+    int sum = 0;
+    zen::timer timer;
+    timer.start();
+    for (int i = 0; i < row_size * col_size; i++)
+        sum += aligned_matrix[i];
+    timer.stop();
+    auto duration_aligned = timer.duration<zen::timer::nsec>().count();
+    std::cout << "Aligned matrix access time (row major): " << duration_aligned << " ns" << std::endl;
+    sum = 0;
+    timer.start();
+    for (int j = 0; j < col_size; ++j)
+        for (int i = 0; i < row_size; ++i) 
+            sum += aligned_matrix[i * col_size + j];
+    timer.stop();
+    duration_aligned = timer.duration<zen::timer::nsec>().count();
+    std::cout << "Aligned matrix access time (column major): " << duration_aligned << " ns" << std::endl;
+    free(aligned_matrix);
+    return true;
 }
 
 int main(int argc, char **argv) {
@@ -91,25 +155,16 @@ int main(int argc, char **argv) {
     int col_size;
     int **matrix;
     
-    matrix = parse_and_initialize(args, row_size, col_size);
-    if (!matrix)
+    if (!parse_input(args, row_size, col_size))
         return 1;
+    matrix = initialize_matrix(row_size, col_size);
+    if (!matrix)
+        return 2;
+    test_matrix_efficiency(matrix, row_size, col_size);
+    delete_matrix(matrix, row_size);
 
-    auto start_row = high_resolution_clock::now();
-    rowMajorAccess(matrix, row_size, col_size);
-    auto end_row = high_resolution_clock::now();
-    auto duration_row = duration_cast<milliseconds>(end_row - start_row);
-    auto start_col = high_resolution_clock::now();
-    columnMajorAccess(matrix, row_size, col_size);
-    auto end_col = high_resolution_clock::now();
-    auto duration_col = duration_cast<milliseconds>(end_col - start_col);
-
-    output_results(duration_row, duration_col, row_size, col_size);
-
-    for (int i = 0; i < row_size; i++) {
-        delete[] matrix[i];
-    }
-    delete[] matrix;
-
+    std::cout << "Testing with aligned and unaligned matrices" << std::endl;
+    test_aligned_matrix(4, 4);
+    test_aligned_matrix(4, 5);
     return 0;
 }
