@@ -150,7 +150,11 @@ bool test_aligned_matrix(int row_size, int col_size)
     timer.stop();
     duration_aligned = timer.duration<zen::timer::nsec>().count();
     std::cout << "Aligned matrix access time (column major): " << duration_aligned << " ns" << std::endl;
-    free(aligned_matrix);
+    #ifdef _WIN32
+    _aligned_free(aligned_matrix);
+    #else
+        free(aligned_matrix);
+    #endif
     return true;
 }
 
