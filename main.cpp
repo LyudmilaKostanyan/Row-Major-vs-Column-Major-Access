@@ -2,7 +2,7 @@
 #include <iomanip>
 #include <cstdlib>
 #include <malloc.h>
-#include <vector>  // Added for dynamic storage
+#include <vector>
 #include "kaizen.h"
 
 using namespace std;
@@ -124,17 +124,19 @@ void test_aligned_matrix(matrix_t aligned_matrix, int row_size, int col_size, ve
     volatile int sum = 0;
     
     timer.start();
-    for (int i = 0; i < row_size * col_size; i++)
-        sum += aligned_matrix[i];
+    for (int k = 0; k < 1000; k++)
+        for (int i = 0; i < row_size * col_size; i++)
+            sum += aligned_matrix[i];
     timer.stop();
-    auto duration_row = timer.duration<zen::timer::nsec>().count();
+    auto duration_row = timer.duration<zen::timer::usec>().count();
     
     timer.start();
-    for (int j = 0; j < col_size; ++j)
-        for (int i = 0; i < row_size; ++i) 
-            sum += aligned_matrix[i * col_size + j];
+    for (int k = 0; k < 1000; k++)
+        for (int j = 0; j < col_size; ++j)
+            for (int i = 0; i < row_size; ++i) 
+                sum += aligned_matrix[i * col_size + j];
     timer.stop();
-    auto duration_col = timer.duration<zen::timer::nsec>().count();
+    auto duration_col = timer.duration<zen::timer::usec>().count();
     
     sizes.push_back({row_size, col_size});
     results.push_back({duration_row, duration_col});
