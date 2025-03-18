@@ -123,39 +123,96 @@ void delete_matrix(int **matrix, int row_size)
     delete[] matrix;
 }
 
-bool test_aligned_matrix(int row_size, int col_size)
+template <typename matrix_t>
+void test_aligned_matrix(matrix_t aligned_matrix,int row_size, int col_size)
 {
-    #ifdef _WIN32
-        alignas(64) int* aligned_matrix = static_cast<int*>(_aligned_malloc(row_size * col_size * sizeof(int), 64));
-    #else
-        alignas(64) int*aligned_matrix = static_cast<int*>(std::aligned_alloc(64, row_size * col_size * sizeof(int)));
-    #endif
-    if (!aligned_matrix)
-        return false;
     for (int i = 0; i < row_size * col_size; i++)
         aligned_matrix[i] = i;
-    int sum = 0;
+    
     zen::timer timer;
+    volatile int sum = 0;
+    
     timer.start();
     for (int i = 0; i < row_size * col_size; i++)
         sum += aligned_matrix[i];
     timer.stop();
-    auto duration_aligned = timer.duration<zen::timer::nsec>().count();
-    std::cout << "Aligned matrix access time (row major): " << duration_aligned << " ns" << std::endl;
-    sum = 0;
+    auto duration_row = timer.duration<zen::timer::nsec>().count();
+    
     timer.start();
     for (int j = 0; j < col_size; ++j)
         for (int i = 0; i < row_size; ++i) 
             sum += aligned_matrix[i * col_size + j];
     timer.stop();
-    duration_aligned = timer.duration<zen::timer::nsec>().count();
-    std::cout << "Aligned matrix access time (column major): " << duration_aligned << " ns" << std::endl;
+    auto duration_col = timer.duration<zen::timer::nsec>().count();
+    
+    static double results[2][2] = {{0, 0}, {0, 0}};
+    static int call_count = 0;
+    
+    int index = (col_size == 4) ? 0 : 1;
+    results[index][0] = duration_row;
+    results[index][1] = duration_col;
+    call_count++;
+
+    if (call_count == 2) {
+        cout << fixed << setprecision(2);
+        cout << "--------------------------------------------------------------------------------------------------------" << endl;
+        cout << left << setw(20) << "Matrix Size" 
+             << right << setw(9) << "Row (ns)" 
+             << setw(13) << "Column (ns)" 
+             << setw(13) << "Speedup (x)" 
+             << setw(13) << "Difference" 
+             << setw(15) << "Row 4x5/4x4" 
+             << setw(15) << "Col 4x5/4x4" << endl;
+        cout << "--------------------------------------------------------------------------------------------------------" << endl;
+
+        for (int i = 0; i < 2; i++) {
+            double row_ns = results[i][0];
+            double col_ns = results[i][1];
+            double diff_ns = col_ns - row_ns;
+            double speedup = row_ns ? col_ns / row_ns : 0;
+            double col_ratio = (i == 0) ? 0 : col_ns / results[0][1];
+            double row_ratio = (i == 0) ? 0 : row_ns / results[0][0];
+            string size = (i == 0) ? "4 x 4" : "4 x 5";
+
+            cout << left << setw(20) << size
+                 << right << setw(7) << row_ns 
+                 << setw(12) << col_ns 
+                 << setw(12) << speedup 
+                 << setw(17) << diff_ns 
+                 << setw(15) << row_ratio 
+                 << setw(15) << col_ratio << endl;
+        }
+        cout << "--------------------------------------------------------------------------------------------------------" << endl << endl;
+        
+        call_count = 0;
+        results[0][0] = results[0][1] = results[1][0] = results[1][1] = 0;
+    }
+}
+
+bool test_allocated_aligned_matrix(int row_size, int col_size)
+{
     #ifdef _WIN32
-    _aligned_free(aligned_matrix);
+        alignas(64) int* aligned_matrix = static_cast<int*>(_aligned_malloc(row_size * col_size * sizeof(int), 64));
+    #else
+        alignas(64) int* aligned_matrix = static_cast<int*>(std::aligned_alloc(64, row_size * col_size * sizeof(int)));
+    #endif
+    if (!aligned_matrix)
+        return false;
+    
+    test_aligned_matrix(aligned_matrix, row_size, col_size);
+    
+    #ifdef _WIN32
+        _aligned_free(aligned_matrix);
     #else
         free(aligned_matrix);
     #endif
     return true;
+}
+
+void test_static_aligned_matrix(int row_size, int col_size)
+{
+    alignas(64) int arr[row_size * col_size];
+    test_aligned_matrix(arr, row_size, col_size);
 }
 
 int main(int argc, char **argv) {
@@ -172,8 +229,14 @@ int main(int argc, char **argv) {
     test_matrix_efficiency(matrix, row_size, col_size);
     delete_matrix(matrix, row_size);
 
-    std::cout << "Testing with aligned and unaligned matrices" << std::endl;
-    test_aligned_matrix(4, 4);
-    test_aligned_matrix(4, 5);
+    std::cout << "Testing row-major vs column-major traversal performance with cache-aligned and unaligned matrices: "
+        << std::endl << "4x4 fits in one cache line, 4x5 spans two" << std::endl;
+    std::cout << "Testing allocated aligned matrix performance: " << std::endl;
+    test_allocated_aligned_matrix(4, 4);
+    test_allocated_aligned_matrix(4, 5);
+
+    std::cout << "Testing static aligned matrix performance: " << std::endl;
+    test_static_aligned_matrix(4, 4);
+    test_static_aligned_matrix(4, 5);
     return 0;
 }
